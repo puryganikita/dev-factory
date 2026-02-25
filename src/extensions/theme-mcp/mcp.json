@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "theme-docs": {
+      "command": "node",
+      "args": [
+        "--experimental-strip-types",
+        "<AI_DEV_FACTORY_DIR>/theme-docs-mcp.ts"
+      ]
+    }
+  }
+}

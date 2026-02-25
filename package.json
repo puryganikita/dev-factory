@@ -1,0 +1,19 @@
+{
+  "name": "dev-factory",
+  "version": "1.0.0",
+  "description": "Dev Factory — agent orchestration system for Cursor IDE",
+  "bin": {
+    "dev-factory": "./cli/bin.mjs"
+  },
+  "files": [
+    "cli/",
+    "dist/"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.29.3"
+}

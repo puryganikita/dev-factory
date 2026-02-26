@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { select, step, success, info, warn, createSpinner, c, box, nl } from './ui.mjs'
-import { loadManifest, saveManifest, collectAllKnownFiles } from './helpers.mjs'
+import { loadManifest, saveManifest, collectAllKnownFiles, cleanOldFiles, cleanOldSkills, copyAgents, copySkills } from './helpers.mjs'
 
 const VERSION_MAP = {
   full: 'all-in',
@@ -40,38 +40,13 @@ export async function runInit({ REPO_ROOT, PROJECT_ROOT }) {
 
   const agentsDest = path.join(CURSOR_DIR, 'agents')
   const skillsDest = path.join(CURSOR_DIR, 'skills')
-  fs.mkdirSync(agentsDest, { recursive: true })
-  fs.mkdirSync(skillsDest, { recursive: true })
 
-  // Clean up old dev-factory files from all versions
   const allKnown = collectAllKnownFiles(DIST)
   cleanOldFiles(agentsDest, allKnown.agents)
   cleanOldSkills(skillsDest, allKnown.skills)
 
-  // Copy agents (flat .md files)
-  const agentsSrc = path.join(srcDir, 'agents')
-  const copiedAgents = []
-  if (fs.existsSync(agentsSrc)) {
-    for (const f of fs.readdirSync(agentsSrc)) {
-      if (!f.endsWith('.md')) continue
-      fs.copyFileSync(path.join(agentsSrc, f), path.join(agentsDest, f))
-      copiedAgents.push(f)
-    }
-  }
-
-  // Copy skills (<name>/SKILL.md structure)
-  const skillsSrc = path.join(srcDir, 'skills')
-  const copiedSkills = []
-  if (fs.existsSync(skillsSrc)) {
-    for (const folder of fs.readdirSync(skillsSrc)) {
-      const skillFile = path.join(skillsSrc, folder, 'SKILL.md')
-      if (!fs.existsSync(skillFile)) continue
-      const destFolder = path.join(skillsDest, folder)
-      fs.mkdirSync(destFolder, { recursive: true })
-      fs.copyFileSync(skillFile, path.join(destFolder, 'SKILL.md'))
-      copiedSkills.push(folder)
-    }
-  }
+  const copiedAgents = copyAgents(path.join(srcDir, 'agents'), agentsDest)
+  const copiedSkills = copySkills(path.join(srcDir, 'skills'), skillsDest)
 
   spinner.succeed('Файлы скопированы')
 
@@ -117,21 +92,3 @@ export async function runInit({ REPO_ROOT, PROJECT_ROOT }) {
   ])
 }
 
-function cleanOldFiles(dir, knownSet) {
-  if (!fs.existsSync(dir)) return
-  for (const f of fs.readdirSync(dir)) {
-    if (knownSet.has(f)) {
-      fs.unlinkSync(path.join(dir, f))
-    }
-  }
-}
-
-function cleanOldSkills(dir, knownSet) {
-  if (!fs.existsSync(dir)) return
-  for (const f of fs.readdirSync(dir)) {
-    const full = path.join(dir, f)
-    if (knownSet.has(f) && fs.statSync(full).isDirectory()) {
-      fs.rmSync(full, { recursive: true })
-    }
-  }
-}

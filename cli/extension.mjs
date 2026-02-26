@@ -108,10 +108,11 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
         }
 
         // Replace placeholder with absolute path to ai-dev-factory/
+        const safePath = FACTORY_DIR.replace(/\\/g, '/')
         const resolved = JSON.parse(
           JSON.stringify(serverConfig).replace(
             /<AI_DEV_FACTORY_DIR>/g,
-            FACTORY_DIR,
+            safePath,
           ),
         )
         cursorMcp.mcpServers[serverName] = resolved

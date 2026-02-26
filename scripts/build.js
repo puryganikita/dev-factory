@@ -108,6 +108,7 @@ function buildTarget(label, versions, destBase) {
 buildTarget('just-do-it',        ['just-do-it'],                                        path.join(DIST, 'just-do-it'));
 buildTarget('analytics-factory', ['analytics-factory'],                                  path.join(DIST, 'analytics-factory'));
 buildTarget('code-factory',      ['code-factory'],                                       path.join(DIST, 'code-factory'));
+buildTarget('factories',         ['analytics-factory', 'code-factory'],                  path.join(DIST, 'factories'));
 buildTarget('all-in',            ['just-do-it', 'analytics-factory', 'code-factory'],    path.join(DIST, 'all-in'));
 
 // --- Extensions (copy as-is) ---

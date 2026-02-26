@@ -1,6 +1,6 @@
 ---
 name: v2_design_analyst
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Аналитик UI/UX. Анализирует задачу со стороны пользовательского интерфейса и взаимодействия. Работает параллельно с v2_component_analyst. Запускается только при ANALYSIS_MODE: full.
 ---
 

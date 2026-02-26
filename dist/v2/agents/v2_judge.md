@@ -1,6 +1,6 @@
 ---
 name: v2_judge
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: >
   Судья конвейера v2. Верифицирует, что каждый участник конвейера выполнил требования
   предшественника точно и полностью. Автоматически определяет маршрут (simple/full)

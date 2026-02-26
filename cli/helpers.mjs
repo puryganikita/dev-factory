@@ -49,6 +49,64 @@ export function collectAllKnownFiles(distDir) {
 }
 
 /**
+ * Remove files from dir whose names appear in knownSet.
+ */
+export function cleanOldFiles(dir, knownSet) {
+  if (!fs.existsSync(dir)) return
+  for (const f of fs.readdirSync(dir)) {
+    if (knownSet.has(f)) {
+      fs.unlinkSync(path.join(dir, f))
+    }
+  }
+}
+
+/**
+ * Remove skill directories from dir whose names appear in knownSet.
+ */
+export function cleanOldSkills(dir, knownSet) {
+  if (!fs.existsSync(dir)) return
+  for (const f of fs.readdirSync(dir)) {
+    const full = path.join(dir, f)
+    if (knownSet.has(f) && fs.statSync(full).isDirectory()) {
+      fs.rmSync(full, { recursive: true })
+    }
+  }
+}
+
+/**
+ * Copy agent .md files from srcDir to destDir. Returns list of copied filenames.
+ */
+export function copyAgents(srcDir, destDir) {
+  const copied = []
+  if (!fs.existsSync(srcDir)) return copied
+  fs.mkdirSync(destDir, { recursive: true })
+  for (const f of fs.readdirSync(srcDir)) {
+    if (!f.endsWith('.md')) continue
+    fs.copyFileSync(path.join(srcDir, f), path.join(destDir, f))
+    copied.push(f)
+  }
+  return copied
+}
+
+/**
+ * Copy skill folders (each containing SKILL.md) from srcDir to destDir. Returns list of copied folder names.
+ */
+export function copySkills(srcDir, destDir) {
+  const copied = []
+  if (!fs.existsSync(srcDir)) return copied
+  fs.mkdirSync(destDir, { recursive: true })
+  for (const folder of fs.readdirSync(srcDir)) {
+    const skillFile = path.join(srcDir, folder, 'SKILL.md')
+    if (!fs.existsSync(skillFile)) continue
+    const destFolder = path.join(destDir, folder)
+    fs.mkdirSync(destFolder, { recursive: true })
+    fs.copyFileSync(skillFile, path.join(destFolder, 'SKILL.md'))
+    copied.push(folder)
+  }
+  return copied
+}
+
+/**
  * Recursively copy a directory.
  */
 export function copyDir(src, dest) {

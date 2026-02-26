@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { select, step, success, info, warn, input, createSpinner, c, box, nl } from './ui.mjs'
+import { select, step, success, info, warn, input, createSpinner, c, box, nl, divider } from './ui.mjs'
 import { loadManifest, saveManifest, readJson, writeJson } from './helpers.mjs'
 
 export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
@@ -9,12 +9,37 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
   const DIST = path.join(REPO_ROOT, 'dist')
   const EXT_DIR = path.join(DIST, 'extensions')
 
+  while (true) {
+    const action = await select('Расширения — что делаем?', [
+      { value: 'install',   label: 'Install',   desc: '— Установить расширение' },
+      { value: 'uninstall', label: 'Uninstall', desc: '— Удалить установленное расширение' },
+      { value: 'back',      label: 'Back',      desc: '— Назад в главное меню' },
+    ])
+
+    if (action.value === 'back') return
+
+    divider()
+
+    if (action.value === 'install') {
+      await installExtension({ EXT_DIR, CURSOR_DIR, FACTORY_DIR })
+    } else if (action.value === 'uninstall') {
+      await uninstallExtension({ CURSOR_DIR, FACTORY_DIR })
+    }
+
+    nl()
+    divider()
+  }
+}
+
+// ── Install Extension ────────────────────────────────────────────────────────
+
+async function installExtension({ EXT_DIR, CURSOR_DIR, FACTORY_DIR }) {
   if (!fs.existsSync(EXT_DIR)) {
     warn('Папка dist/extensions/ не найдена')
     return
   }
 
-  // ── Step 1: List extensions ─────────────────────────────────────────────
+  // ── Step 1: List extensions ───────────────────────────────────────────────
 
   step(1, 3, 'Выбор расширения')
   nl()
@@ -53,7 +78,7 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
   const extName = chosen.value
   const extPath = path.join(EXT_DIR, extName)
 
-  // ── Step 2: Install ─────────────────────────────────────────────────────
+  // ── Step 2: Install ───────────────────────────────────────────────────────
 
   step(2, 3, `Установка ${c.cyan(extName)}`)
 
@@ -67,7 +92,7 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
   const installedMcpServers = []
   const copiedMcpScripts = []
 
-  // ── Skills ──────────────────────────────────────────────────────────────
+  // ── Skills ────────────────────────────────────────────────────────────────
 
   if (hasSkills) {
     const skillsSrc = path.join(extPath, 'skills')
@@ -83,7 +108,7 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
     }
   }
 
-  // ── MCP ─────────────────────────────────────────────────────────────────
+  // ── MCP ───────────────────────────────────────────────────────────────────
 
   if (hasMcpDir && hasMcpJson) {
     fs.mkdirSync(FACTORY_DIR, { recursive: true })
@@ -94,20 +119,17 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
       const cursorMcp = readJson(cursorMcpPath, { mcpServers: {} })
       if (!cursorMcp.mcpServers) cursorMcp.mcpServers = {}
 
-      // Copy MCP script to ai-dev-factory/ and wire up .cursor/mcp.json
       const mcpSrcScript = path.join(extPath, 'mcp', 'src', 'index.ts')
 
       for (const [serverName, serverConfig] of Object.entries(extMcpConfig.mcpServers)) {
         const scriptName = `${serverName}-mcp.ts`
         const destScript = path.join(FACTORY_DIR, scriptName)
 
-        // Copy the MCP server script into ai-dev-factory/
         if (fs.existsSync(mcpSrcScript)) {
           fs.copyFileSync(mcpSrcScript, destScript)
           copiedMcpScripts.push(scriptName)
         }
 
-        // Replace placeholder with absolute path to ai-dev-factory/
         const safePath = FACTORY_DIR.replace(/\\/g, '/')
         const resolved = JSON.parse(
           JSON.stringify(serverConfig).replace(
@@ -125,7 +147,7 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
 
   spinner.succeed(`Расширение ${c.cyan(extName)} установлено`)
 
-  // ── Report ──────────────────────────────────────────────────────────────
+  // ── Report ────────────────────────────────────────────────────────────────
 
   nl()
   if (installedSkills.length > 0) {
@@ -138,7 +160,7 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
     info(`MCP-скрипты: ${copiedMcpScripts.map(s => c.cyan(`ai-dev-factory/${s}`)).join(', ')}`)
   }
 
-  // ── Step 3: Config ──────────────────────────────────────────────────────
+  // ── Step 3: Config ────────────────────────────────────────────────────────
 
   step(3, 3, 'Конфигурация')
 
@@ -168,7 +190,7 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
     info('Расширение без MCP — конфигурация не требуется')
   }
 
-  // ── Update manifest ─────────────────────────────────────────────────────
+  // ── Update manifest ───────────────────────────────────────────────────────
 
   const manifest = loadManifest(CURSOR_DIR)
   if (!manifest.extensions) manifest.extensions = {}
@@ -180,7 +202,7 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
   }
   saveManifest(CURSOR_DIR, manifest)
 
-  // ── Summary ─────────────────────────────────────────────────────────────
+  // ── Summary ───────────────────────────────────────────────────────────────
 
   nl()
   const summaryLines = [c.bold(`Расширение ${extName} установлено!`), '']
@@ -194,4 +216,108 @@ export async function runExtension({ REPO_ROOT, PROJECT_ROOT }) {
     summaryLines.push('', c.dim('Перезапусти Cursor для активации MCP-сервера'))
 
   box(summaryLines)
+}
+
+// ── Uninstall Extension ──────────────────────────────────────────────────────
+
+async function uninstallExtension({ CURSOR_DIR, FACTORY_DIR }) {
+  const manifest = loadManifest(CURSOR_DIR)
+  const installed = Object.keys(manifest.extensions || {})
+
+  if (installed.length === 0) {
+    info('Нет установленных расширений')
+    return
+  }
+
+  // ── Step 1: Select ────────────────────────────────────────────────────────
+
+  step(1, 2, 'Выбор расширения для удаления')
+  nl()
+
+  const options = installed.map((name) => {
+    const ext = manifest.extensions[name]
+    const parts = []
+    if (ext.skills?.length) parts.push(`skills: ${ext.skills.length}`)
+    if (ext.mcpServers?.length) parts.push(`MCP: ${ext.mcpServers.join(', ')}`)
+    return { value: name, label: name, desc: parts.length ? `— ${parts.join(', ')}` : '' }
+  })
+
+  const chosen = await select('Какое расширение удалить?', options)
+  const extName = chosen.value
+  const ext = manifest.extensions[extName]
+
+  // ── Step 2: Remove ────────────────────────────────────────────────────────
+
+  step(2, 2, `Удаление ${c.cyan(extName)}`)
+
+  const spinner = createSpinner('Удаляю...').start()
+
+  let removedSkills = 0
+  let removedMcp = 0
+  let removedScripts = 0
+
+  // Remove skills
+  if (ext.skills) {
+    const skillsDir = path.join(CURSOR_DIR, 'skills')
+    for (const skill of ext.skills) {
+      const skillPath = path.join(skillsDir, skill)
+      if (fs.existsSync(skillPath)) {
+        fs.rmSync(skillPath, { recursive: true })
+        removedSkills++
+      }
+    }
+  }
+
+  // Remove MCP server entries from .cursor/mcp.json
+  if (ext.mcpServers) {
+    const cursorMcpPath = path.join(CURSOR_DIR, 'mcp.json')
+    const cursorMcp = readJson(cursorMcpPath)
+    if (cursorMcp?.mcpServers) {
+      for (const server of ext.mcpServers) {
+        if (cursorMcp.mcpServers[server]) {
+          delete cursorMcp.mcpServers[server]
+          removedMcp++
+        }
+      }
+      writeJson(cursorMcpPath, cursorMcp)
+    }
+  }
+
+  // Remove MCP scripts from ai-dev-factory/
+  if (ext.mcpScripts) {
+    for (const script of ext.mcpScripts) {
+      const scriptPath = path.join(FACTORY_DIR, script)
+      if (fs.existsSync(scriptPath)) {
+        fs.unlinkSync(scriptPath)
+        removedScripts++
+      }
+    }
+  }
+
+  // Remove extension config from dev-factory.config.json
+  const configPath = path.join(FACTORY_DIR, 'dev-factory.config.json')
+  const config = readJson(configPath)
+  if (config?.extensions?.[extName]) {
+    delete config.extensions[extName]
+    writeJson(configPath, config)
+  }
+
+  // Remove from manifest
+  delete manifest.extensions[extName]
+  saveManifest(CURSOR_DIR, manifest)
+
+  spinner.succeed(`Расширение ${c.cyan(extName)} удалено`)
+
+  // ── Summary ───────────────────────────────────────────────────────────────
+
+  nl()
+  box([
+    c.bold(`Расширение ${extName} удалено!`),
+    '',
+    `${c.gray('Скиллов удалено:')}      ${c.bold(String(removedSkills))}`,
+    `${c.gray('MCP-серверов удалено:')} ${c.bold(String(removedMcp))}`,
+    `${c.gray('Скриптов удалено:')}     ${c.bold(String(removedScripts))}`,
+    '',
+    c.dim('Перезапусти Cursor для применения изменений'),
+  ])
 }

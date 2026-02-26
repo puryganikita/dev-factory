@@ -4,9 +4,10 @@ import { select, step, success, info, warn, createSpinner, c, box, nl } from './
 import { loadManifest, saveManifest, collectAllKnownFiles, cleanOldFiles, cleanOldSkills, copyAgents, copySkills } from './helpers.mjs'
 
 const VERSION_MAP = {
+  'just-do-it': 'just-do-it',
+  'analytics-factory': 'analytics-factory',
+  'code-factory': 'code-factory',
   full: 'all-in',
-  v1: 'v1',
-  v2: 'v2',
 }
 
 export async function runInit({ REPO_ROOT, PROJECT_ROOT }) {
@@ -19,10 +20,11 @@ export async function runInit({ REPO_ROOT, PROJECT_ROOT }) {
   step(1, 3, 'Выбор варианта установки')
   nl()
 
-  const version = await select('Какую версию core установить?', [
-    { value: 'full', label: 'full (v1 + v2)', desc: '— все агенты и скиллы' },
-    { value: 'v1',   label: 'v1',             desc: '— базовый набор' },
-    { value: 'v2',   label: 'v2',             desc: '— расширенный набор' },
+  const version = await select('Какой инструмент установить?', [
+    { value: 'full',               label: 'full',               desc: '— все инструменты' },
+    { value: 'just-do-it',         label: 'just-do-it',         desc: '— простой конвейер (analyst → architect → engineer → developer)' },
+    { value: 'code-factory',       label: 'code-factory',       desc: '— конвейер реализации (task_analyst → architect → engineers → developers)' },
+    { value: 'analytics-factory',  label: 'analytics-factory',  desc: '— аналитика и декомпозиция (analyst → design/component → final → board)' },
   ])
 
   const distKey = VERSION_MAP[version.value]

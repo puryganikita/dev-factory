@@ -28,7 +28,7 @@ export function collectAllKnownFiles(distDir) {
   const agents = new Set()
   const skills = new Set()
 
-  for (const ver of ['v1', 'v2', 'all-in']) {
+  for (const ver of ['just-do-it', 'analytics-factory', 'code-factory', 'all-in']) {
     const agentsDir = path.join(distDir, ver, 'agents')
     if (fs.existsSync(agentsDir)) {
       for (const f of fs.readdirSync(agentsDir)) {

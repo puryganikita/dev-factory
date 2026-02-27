@@ -28,12 +28,20 @@ description: Аналитик UI/UX. Анализирует задачу со с
 
 1. **get_design_context(nodeId)** — получи структурные данные (CSS, иерархия, spacing, цвета, типографика)
 2. **get_screenshot(nodeId)** — получи скриншот компонента/экрана
+3. **Сохрани скриншот на диск** через MCP `image-utils`:
+   ```json
+   { "server": "image-utils", "toolName": "save_base64_image", "arguments": {
+       "base64": "<base64-данные из ответа get_screenshot>",
+       "filePath": "ai/tasks/task-<NN>-<название>/design_context/<component-name>_screenshot.png"
+   }}
+   ```
 
 Сохрани результаты в папку `ai/tasks/task-<NN>-<название>/design_context/`:
 - `<component-name>_context.md` — структурные данные из `get_design_context` (CSS-значения, иерархия элементов, spacing, цвета, типографика, размеры)
+- `<component-name>_screenshot.png` — скриншот компонента из Figma (сохранённый через `image-utils` MCP)
 - `figma_nodes.md` — маппинг: компонент → nodeId → описание, для повторного обращения к Figma downstream-агентами
 
-**Важно:** сохраняй сырые данные из Figma MCP максимально полно. Эти файлы будут переданы архитектору и инженерам как первоисточник дизайн-спецификации.
+**Важно:** сохраняй сырые данные из Figma MCP максимально полно. Эти файлы будут переданы архитектору и инженерам как первоисточник дизайн-спецификации. Скриншоты — обязательная часть контекста, не пропускай их.
 
 ## Входные данные
 Путь к папке задачи. Агент самостоятельно читает:
@@ -44,9 +52,9 @@ description: Аналитик UI/UX. Анализирует задачу со с
 
 ## Выходные данные
 1. `ai/tasks/task-<NN>-<название>/design_analyst_output.md`
-2. `ai/tasks/task-<NN>-<название>/design_context/` — папка с файлами дизайн-контекста
+2. `ai/tasks/task-<NN>-<название>/design_context/` — папка с файлами дизайн-контекста (`.md` + `.png`)
 - Не модифицируй `analyst_output.md`
-- После сохранения сообщи: "✅ design_analyst_output.md сохранён + design_context/ (N файлов)"
+- После сохранения сообщи: "✅ design_analyst_output.md сохранён + design_context/ (N файлов, из них M скриншотов)"
 
 ## Формат design_analyst_output.md
 
@@ -55,7 +63,7 @@ description: Аналитик UI/UX. Анализирует задачу со с
 
 ### Дизайн-контекст
 Для каждого компонента, по которому собран контекст из Figma:
-- **[ComponentName]** — см. `design_context/<component-name>_context.md`
+- **[ComponentName]** — см. `design_context/<component-name>_context.md` + `design_context/<component-name>_screenshot.png`
   Ключевые параметры: [основные цвета, размеры, spacing — краткая выжимка]
 
 ### Карта состояний компонентов

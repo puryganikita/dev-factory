@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "image-utils": {
+      "command": "node",
+      "args": [
+        "--experimental-strip-types",
+        "<AI_DEV_FACTORY_DIR>/image-utils-mcp.ts"
+      ]
+    }
+  }
+}

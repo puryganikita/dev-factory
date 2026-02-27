@@ -1,6 +1,6 @@
 ---
 name: librarian
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Хранитель knowledge base. Обновляет институциональную память проекта на основе подтверждённых предложений от judge. Запускается только после явного подтверждения пользователем правил из librarian_suggestions.md.
 ---
 

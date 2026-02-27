@@ -1,6 +1,6 @@
 ---
 name: task_analyst
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Аналитик задачи. Материализует контекст из GitHub issue в локальную папку ai/tasks/ (скачивает task_spec, design_context, скриншоты), формирует final_analyst_output.md. В автономном режиме (без issue) — классифицирует задачу и создаёт final_analyst_output.md самостоятельно. Первый агент в конвейере code-factory.
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: board_manager
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Менеджер доски. Читает декомпозированные подзадачи из final_analyst_output.md и создаёт GitHub Issues в Projects V2, загружая ВЕСЬ контекст (task_spec + design_context) в issue body и comments. Поддерживает два метода доступа к GitHub: gh CLI и GitHub MCP. Метод передаётся оркестратором. Запускается строго после final_analyst.
 ---
 

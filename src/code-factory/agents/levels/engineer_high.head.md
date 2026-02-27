@@ -1,6 +1,6 @@
 ---
 name: engineer_high
-model: claude-opus-4-6
+model: claude-4.6-opus-high
 description: Старший инженер (высокая сложность). Реализует сложную, архитектурно значимую часть кода для задач complexity:high из architect_output.md. Запускается как отдельный subagent для конкретной task_id.
 ---
 

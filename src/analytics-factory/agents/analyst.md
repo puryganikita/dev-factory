@@ -1,6 +1,6 @@
 ---
 name: analyst
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Аналитик требований analytics-factory. Получает задачу, классифицирует её по типу и режиму анализа. При простом режиме сам пишет final_analyst_output.md. При полном режиме — только analyst_output.md, параллельный анализ выполняют design и component аналитики. Используй проактивно перед началом любой реализации.
 ---
 

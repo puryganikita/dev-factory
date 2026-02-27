@@ -1,4 +1,5 @@
 {
+  "noConfig": true,
   "mcpServers": {
     "image-utils": {
       "command": "node",

@@ -87,6 +87,7 @@ async function installExtension({ EXT_DIR, CURSOR_DIR, FACTORY_DIR }) {
   const hasMcpDir = fs.existsSync(path.join(extPath, 'mcp'))
   const hasMcpJson = fs.existsSync(path.join(extPath, 'mcp.json'))
   const hasSkills = fs.existsSync(path.join(extPath, 'skills'))
+  const extMcpConfig = hasMcpJson ? readJson(path.join(extPath, 'mcp.json')) : null
 
   const installedSkills = []
   const installedMcpServers = []
@@ -113,7 +114,6 @@ async function installExtension({ EXT_DIR, CURSOR_DIR, FACTORY_DIR }) {
   if (hasMcpDir && hasMcpJson) {
     fs.mkdirSync(FACTORY_DIR, { recursive: true })
 
-    const extMcpConfig = readJson(path.join(extPath, 'mcp.json'))
     if (extMcpConfig && extMcpConfig.mcpServers) {
       const cursorMcpPath = path.join(CURSOR_DIR, 'mcp.json')
       const cursorMcp = readJson(cursorMcpPath, { mcpServers: {} })
@@ -164,7 +164,7 @@ async function installExtension({ EXT_DIR, CURSOR_DIR, FACTORY_DIR }) {
 
   step(3, 3, 'Конфигурация')
 
-  if (hasMcpDir) {
+  if (hasMcpDir && !extMcpConfig?.noConfig) {
     const configPath = path.join(FACTORY_DIR, 'dev-factory.config.json')
     const config = readJson(configPath, { extensions: {} })
     if (!config.extensions) config.extensions = {}
@@ -187,7 +187,7 @@ async function installExtension({ EXT_DIR, CURSOR_DIR, FACTORY_DIR }) {
       info(`Секция ${c.cyan(extName)} уже есть в конфиге — не перезаписываю`)
     }
   } else {
-    info('Расширение без MCP — конфигурация не требуется')
+    info('Конфигурация не требуется')
   }
 
   // ── Update manifest ───────────────────────────────────────────────────────

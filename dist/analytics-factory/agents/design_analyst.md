@@ -1,6 +1,6 @@
 ---
 name: design_analyst
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Аналитик UI/UX. Анализирует задачу со стороны пользовательского интерфейса и взаимодействия. Использует Figma MCP для получения дизайн-контекста и скриншотов, сохраняет всё в design_context/. Работает параллельно с component_analyst. Запускается только при ANALYSIS_MODE: full.
 ---
 

@@ -121,12 +121,25 @@ description: Оркестрирует конвейер реализации code
 
 ## Активация domain-specific скиллов
 
+### Базовая карта (core)
+
 | TASK_DOMAIN | Активные domain-specific скиллы |
 |-------------|--------------------------------|
 | `frontend` | `frontend-code-style` |
 | `fullstack` | `frontend-code-style` (для frontend-части) |
 | `backend` | backend-specific скиллы (когда будут добавлены) |
 | `infra` / `other` | нет domain-specific скиллов |
+
+### Расширение карты через extension-скиллы
+
+Базовая карта выше — не финальная. Расширения могут добавлять дополнительные
+domain-specific скиллы. Перед передачей скиллов саб-агенту:
+
+1. Найди все доступные скиллы с суффиксом `-orchestration-ext` в имени
+   (например, `biam-project-orchestration-ext`, `kit-mcp-orchestration-ext`)
+2. Прочитай каждый такой скилл — он содержит таблицу дополнительных скиллов по доменам
+3. Объедини все таблицы с базовой картой
+4. Передай саб-агенту полный набор скиллов для его `TASK_DOMAIN`
 
 **Универсальные скиллы (всегда активны):**
 - `architecture-principles`

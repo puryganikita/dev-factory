@@ -1,6 +1,6 @@
 ---
 name: component_analyst
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Аналитик модулей. Сканирует существующую кодовую базу и определяет какие модули (компоненты, сервисы, репозитории) затрагивает задача. Адаптирует анализ под TASK_DOMAIN. Работает параллельно с design_analyst (при frontend/fullstack). Запускается только при ANALYSIS_MODE: full.
 ---
 

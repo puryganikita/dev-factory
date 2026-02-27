@@ -1,6 +1,6 @@
 ---
 name: architect
-model: claude-opus-4-6
+model: claude-4.6-opus-high
 description: Архитектор решения. Получает final_analyst_output.md и проектирует техническое решение. Явно размечает инженерные задачи по независимости и сложности для параллельного dispatch. Использовать после task_analyst, перед инженерами.
 ---
 

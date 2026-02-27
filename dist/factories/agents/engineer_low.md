@@ -1,6 +1,6 @@
 ---
 name: engineer_low
-model: claude-sonnet-4-6-thinking
+model: claude-4.6-sonnet-medium-thinking
 description: Старший инженер (низкая сложность). Реализует архитектурно значимую часть кода для задач complexity:low из architect_output.md. Запускается как отдельный subagent для конкретной task_id.
 ---
 

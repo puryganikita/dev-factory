@@ -146,7 +146,7 @@ ANALYSIS_MODE: [simple | full]
 **После параллельных аналитиков:**
 ```
 ✅ Параллельный анализ завершён (2/2 аналитиков)
-📄 design_analyst_output.md + design_context/ (N файлов)
+📄 design_analyst_output.md + design_context/ (N файлов контекста, figma_nodes.md)
 📄 component_analyst_output.md
 ⏸ Жду следующей команды.
 ```

@@ -1,0 +1,9 @@
+{
+  "name": "@dev-factory/image-utils-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts"
+  }
+}

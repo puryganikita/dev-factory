@@ -1,6 +1,6 @@
 {
   "name": "dev-factory",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Dev Factory — agent orchestration system for Cursor IDE",
   "bin": {
     "dev-factory": "./cli/bin.mjs"

@@ -1,6 +1,6 @@
 ---
 name: analytics-pipeline-orchestration
-description: Оркестрирует аналитический конвейер analytics-factory. Определяет маршрут по типу задачи и домену, управляет параллельным запуском аналитиков, передаёт результаты в board_manager для создания задач в GitHub Projects V2. Используй при вызове любого агента analytics-factory или при запросе "запусти аналитику".
+description: Оркестрирует аналитический конвейер analytics-factory. Начинает с сегментации задания, затем маршрутизирует по типу задачи и домену, управляет параллельным запуском аналитиков (в том числе параллельно по сегментам), передаёт результаты в board_manager для создания задач в GitHub Projects V2. Используй при вызове любого агента analytics-factory или при запросе "запусти аналитику".
 ---
 
 # Оркестрация аналитического конвейера
@@ -8,7 +8,10 @@ description: Оркестрирует аналитический конвейе�
 ## Структура конвейера
 
 ```
-Пользователь → @analyst → analyst_output.md (TASK_TYPE + TASK_DOMAIN + ANALYSIS_MODE)
+Пользователь → @segment_analyst → segment_analyst_output.md (SEGMENT_MODE)
+                    ↓
+         [SEGMENT_MODE: single]
+            @analyst → analyst_output.md (TASK_TYPE + TASK_DOMAIN + ANALYSIS_MODE)
                                 ↓
                 [ANALYSIS_MODE: full, TASK_DOMAIN: frontend/fullstack]
                 @design_analyst ‖ @component_analyst   (параллельно)
@@ -21,7 +24,14 @@ description: Оркестрирует аналитический конвейе�
                 [ANALYSIS_MODE: simple]
                 analyst сам пишет final_analyst_output.md
                                 ↓
-                @board_manager → board_output.md (issues в GitHub Projects V2)
+            @board_manager → board_output.md (issues в GitHub Projects V2)
+
+         [SEGMENT_MODE: multi]
+            Для КАЖДОГО сегмента ПАРАЛЛЕЛЬНО:
+              @analyst → маршрутизация → @final_analyst
+            (путь = папка сегмента)
+                                ↓
+            @board_manager → board_output.md (parent issues + sub-issues)
 ```
 
 ## Главное правило — оркестратор НЕ выполняет работу
@@ -32,33 +42,64 @@ description: Оркестрирует аналитический конвейе�
 **Запрещено:**
 - Использовать MCP-инструменты (Figma, браузер, БД, документация и др.)
 - Читать файлы проекта (кроме output-файлов агентов для определения маршрута)
-- Создавать, редактировать или удалять файлы
+- Создавать, редактировать или удалять файлы (кроме создания папок сегментов при multi)
 - Собирать контекст для агентов — каждый агент сам получает нужный ему контекст
 - Выполнять подготовительные действия перед вызовом первого агента
 - Анализировать код проекта, дизайн, API или любые артефакты
 
-**Первое действие** после получения задачи — вызов `@analyst`.
+**Первое действие** после получения задачи — вызов `@segment_analyst`.
 
-**Единственное исключение для чтения файлов:** output-файлы агентов (`analyst_output.md`,
-`final_analyst_output.md`) — оркестратор читает их для определения следующего шага маршрута.
+**Единственное исключение для чтения файлов:** output-файлы агентов (`segment_analyst_output.md`,
+`analyst_output.md`, `final_analyst_output.md`) — оркестратор читает их для определения следующего шага маршрута.
 
 ## Что передавать каждому агенту
 
 | Агент | Что передавать |
 |-------|----------------|
-| `@analyst` | Задачу пользователя дословно + путь к папке задачи |
-| `@design_analyst` | Только путь к папке задачи |
-| `@component_analyst` | Только путь к папке задачи |
-| `@final_analyst` | Только путь к папке задачи |
-| `@board_manager` | Путь к папке задачи + owner/repo + project_number + github_method (`gh` или `mcp`) |
+| `@segment_analyst` | Задачу пользователя дословно + путь к папке задачи |
+| `@analyst` (при single) | Задачу пользователя дословно + путь к папке задачи |
+| `@analyst` (при multi) | Путь к папке сегмента + «Задача для аналитика» + «Границы контекста» из segment_analyst_output.md |
+| `@design_analyst` | Только путь к папке задачи (или папке сегмента при multi) |
+| `@component_analyst` | Только путь к папке задачи (или папке сегмента при multi) |
+| `@final_analyst` | Только путь к папке задачи (или папке сегмента при multi) |
+| `@board_manager` | Путь к корневой папке задачи + owner/repo + project_number + github_method (`gh` или `mcp`) |
 
 При создании агента, открывай ему доступ до папки .cursor/skills (открывай доступ ко всем skills) - агент сам определит какие skills он должен использовать.
 
-## Доменная маршрутизация [full analysis]
+## Этап 0: Сегментация
 
-При `ANALYSIS_MODE: simple` — блок [full analysis] пропускается: `@analyst` сам написал `final_analyst_output.md`.
+**Первое действие** после получения задачи — вызов `@segment_analyst`.
 
-При `ANALYSIS_MODE: full` — состав [full analysis] зависит от `TASK_DOMAIN`:
+После завершения прочитай `segment_analyst_output.md` и определи `SEGMENT_MODE`:
+
+### SEGMENT_MODE: single
+
+Конвейер работает как обычно — переходи к Этапу 1 с путём к папке задачи.
+
+### SEGMENT_MODE: multi
+
+1. Создай папки для каждого сегмента: `ai/tasks/task-<NN>-<name>/segments/segment-NN-<name>/`
+2. Запусти `@analyst` **параллельно** для каждого сегмента — каждому передай:
+   - Путь к папке сегмента
+   - «Задача для аналитика» из соответствующего сегмента в segment_analyst_output.md
+   - «Границы контекста» из соответствующего сегмента в segment_analyst_output.md
+3. После завершения всех `@analyst` — для каждого сегмента прочитай его `analyst_output.md` и маршрутизируй по стандартным правилам (Этап 1), подставляя путь к папке сегмента
+4. Параллельные этапы (design_analyst ‖ component_analyst) для разных сегментов можно запускать параллельно
+5. После завершения всех сегментов — один запуск `@board_manager` с путём к корневой папке задачи
+
+## Этап 1: Классификация (analyst)
+
+При `SEGMENT_MODE: single` — вызови `@analyst` с задачей пользователя и путём к папке задачи.
+При `SEGMENT_MODE: multi` — `@analyst` уже запущен на этапе 0.
+
+После завершения прочитай `analyst_output.md` и определи `ANALYSIS_MODE`:
+
+- `ANALYSIS_MODE: simple` → `@analyst` сам написал `final_analyst_output.md` → переходи к Board Manager
+- `ANALYSIS_MODE: full` → переходи к Этапу 2
+
+## Этап 2: Доменная маршрутизация [full analysis]
+
+Состав [full analysis] зависит от `TASK_DOMAIN`:
 
 | TASK_DOMAIN | [full analysis] |
 |-------------|-----------------|
@@ -79,9 +120,21 @@ description: Оркестрирует аналитический конвейе�
 ← оба запущены параллельно
 ```
 
+При `SEGMENT_MODE: multi` параллелизм распространяется и на сегменты:
+
+```
+← один ответ содержит:
+  @analyst (папка=segments/segment-01-homepage/)
+  @analyst (папка=segments/segment-02-catalog/)
+  @analyst (папка=segments/segment-03-profile/)
+← все запущены параллельно
+```
+
 ## Board Manager — завершение конвейера
 
-`@board_manager` запускается **всегда** в конце конвейера (и при simple, и при full).
+`@board_manager` запускается **всегда** в конце конвейера (и при simple, и при full, и при single, и при multi).
+
+При `SEGMENT_MODE: multi` — `@board_manager` получает путь к **корневой** папке задачи (не к папке сегмента). Он сам прочитает `segment_analyst_output.md` и обработает все сегменты.
 
 ### Перед запуском board_manager — выбор метода доступа к GitHub
 
@@ -134,12 +187,30 @@ description: Оркестрирует аналитический конвейе�
 
 ## Формат сообщения после каждого агента
 
-**Для одиночных агентов:**
+**После segment_analyst:**
+```
+✅ @segment_analyst завершил работу
+📄 ai/tasks/task-<NN>-<название>/segment_analyst_output.md
+SEGMENT_MODE: [single | multi]
+Сегментов: N
+⏸ Жду следующей команды.
+```
+
+**После analyst (single):**
 ```
 ✅ @analyst завершил работу
 📄 ai/tasks/task-<NN>-<название>/analyst_output.md
 TASK_DOMAIN: [frontend | backend | fullstack | infra | other]
 ANALYSIS_MODE: [simple | full]
+⏸ Жду следующей команды.
+```
+
+**После analyst (multi — все сегменты):**
+```
+✅ @analyst завершил работу для N сегментов
+📄 segments/segment-01-<name>/analyst_output.md — TASK_DOMAIN: ..., ANALYSIS_MODE: ...
+📄 segments/segment-02-<name>/analyst_output.md — TASK_DOMAIN: ..., ANALYSIS_MODE: ...
+...
 ⏸ Жду следующей команды.
 ```
 

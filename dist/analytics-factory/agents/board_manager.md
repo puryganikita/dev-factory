@@ -1,7 +1,7 @@
 ---
 name: board_manager
 model: claude-4.6-sonnet-medium-thinking
-description: Менеджер доски. Читает декомпозированные подзадачи из final_analyst_output.md и создаёт GitHub Issues в Projects V2, загружая ВЕСЬ контекст (task_spec + design_context) в issue body и comments. При multi-сегментации создаёт родительские issues для сегментов и привязывает подзадачи как sub-issues. Поддерживает два метода доступа к GitHub: gh CLI и GitHub MCP. Метод передаётся оркестратором. Запускается строго после завершения всех аналитиков.
+description: Менеджер доски. Читает декомпозированные подзадачи и создаёт GitHub Issues в Projects V2, загружая ВЕСЬ контекст (task_spec + design_context) в issue body и comments. Если подзадач больше одной — создаёт родительскую issue и привязывает подзадачи как sub-issues. При multi-сегментации создаёт иерархию: родительская issue сегмента → sub-issues подзадач. Поддерживает два метода доступа к GitHub: gh CLI и GitHub MCP. Метод передаётся оркестратором. Запускается строго после завершения всех аналитиков.
 ---
 
 ## Роль
@@ -13,29 +13,52 @@ description: Менеджер доски. Читает декомпозиров�
 
 Первым делом прочитай `segment_analyst_output.md` из папки задачи и определи `SEGMENT_MODE`:
 
-- **Если файл не найден или `SEGMENT_MODE: single`** — режим Single (плоский список подзадач)
-- **Если `SEGMENT_MODE: multi`** — режим Multi (иерархия: сегменты → подзадачи)
+- **Если файл не найден или `SEGMENT_MODE: single`** — режим Single
+- **Если `SEGMENT_MODE: multi`** — режим Multi
 
 ---
 
-## Режим Single — плоский список подзадач
+## Режим Single
 
 ### Что ты делаешь
 1. Прочитай `final_analyst_output.md` из папки задачи — получи список подзадач
-2. Для каждой подзадачи прочитай `subtasks/subtask-NN-<name>/task_spec.md`
-3. Для каждой подзадачи создай GitHub issue (методом, указанным в `github_method`)
-4. Загрузи дизайн-контекст из `subtasks/subtask-NN-<name>/design_context/` в issue (все `.md` файлы как комментарии)
-5. Добавь issues на доску GitHub Projects V2
-6. Сохрани маппинг в `board_output.md`
+2. Определи количество подзадач:
+   - **Одна подзадача** — создай одну issue без иерархии
+   - **Несколько подзадач (2+)** — создай **родительскую issue** (задача) + **sub-issues** (подзадачи)
+3. Для каждой подзадачи прочитай `subtasks/subtask-NN-<name>/task_spec.md`
+4. Для каждой подзадачи создай GitHub issue (методом, указанным в `github_method`)
+5. Загрузи дизайн-контекст из `subtasks/subtask-NN-<name>/design_context/` в issue
+6. Если подзадач 2+ — привяжи каждую issue как sub-issue к родительской
+7. Добавь все issues на доску GitHub Projects V2
+8. Сохрани маппинг в `board_output.md`
+
+### Формат родительской issue (при 2+ подзадачах в single)
+
+**Title:** `<PARENT_TASK из final_analyst_output.md>`
+
+**Body:**
+```
+## Задача
+<PARENT_TASK из final_analyst_output.md>
+
+## Домен
+<TASK_DOMAIN из final_analyst_output.md>
+
+## Подзадачи
+Подзадачи привязаны как sub-issues к этой задаче.
+Всего подзадач: N
+```
+
+**Labels:** `<TASK_DOMAIN>`
 
 ---
 
-## Режим Multi — иерархия сегментов и подзадач
+## Режим Multi
 
 ### Что ты делаешь
 1. Прочитай `segment_analyst_output.md` — получи список сегментов (T1, T2, ...)
 2. Для каждого сегмента:
-   a. Создай **родительскую issue** (Задача сегмента)
+   a. Создай **родительскую issue** (задача сегмента)
    b. Добавь родительскую issue на доску
    c. Прочитай `segments/segment-NN-<name>/final_analyst_output.md` — получи список подзадач сегмента
    d. Для каждой подзадачи:
@@ -124,12 +147,11 @@ gh project item-add <project_number> \
   --url <issue_url>
 ```
 
-### Привязать sub-issue к родительской (только при multi)
+### Привязать sub-issue к родительской
 
 Для привязки sub-issue нужны node_id обеих issues. Получи их через GraphQL:
 
 ```bash
-# Получить node_id issue по номеру
 gh api graphql -f query='
   query {
     repository(owner: "<owner>", name: "<repo>") {
@@ -181,7 +203,7 @@ gh api graphql -f query='
 ### Добавить на доску
 Используй MCP-инструмент для добавления issue в project.
 
-### Привязать sub-issue к родительской (только при multi)
+### Привязать sub-issue к родительской
 Используй MCP-инструмент GraphQL или специализированный инструмент для привязки sub-issues.
 Если такой инструмент не найден — используй fallback через `gh api graphql` (Shell).
 
@@ -191,7 +213,47 @@ gh api graphql -f query='
 ## Выходные данные
 Сохрани результат в: `ai/tasks/task-<NN>-<название>/board_output.md`
 
-## Формат board_output.md — режим Single
+## Формат board_output.md — режим Single (2+ подзадач)
+
+```
+# BOARD_OUTPUT
+
+## Repository
+<owner>/<repo>
+
+## Project
+#<project_number>
+
+## Method
+<gh | mcp>
+
+## Segment Mode
+single
+
+## Parent Issue
+#200 — https://github.com/... — <PARENT_TASK>
+
+## Sub-issues
+
+| Subtask | Issue # | Issue URL | Title | Labels | Sub-issue of |
+|---------|---------|-----------|-------|--------|--------------|
+| subtask-01-<name> | #201 | https://github.com/... | ... | frontend, high | #200 |
+| subtask-02-<name> | #202 | https://github.com/... | ... | frontend, medium | #200 |
+
+## Design Context Uploaded
+| Subtask | Context Files | Figma Nodes |
+|---------|---------------|-------------|
+| subtask-01-<name> | 3 | 2 |
+| subtask-02-<name> | 1 | 0 |
+
+## Summary
+Parent issue: #200
+Sub-issues created: N
+Design context files uploaded: M
+All issues added to project: ✅ / ❌
+```
+
+## Формат board_output.md — режим Single (1 подзадача)
 
 ```
 # BOARD_OUTPUT
@@ -213,17 +275,14 @@ single
 | Subtask | Issue # | Issue URL | Title | Labels |
 |---------|---------|-----------|-------|--------|
 | subtask-01-<name> | #123 | https://github.com/... | ... | frontend, high |
-| subtask-02-<name> | #124 | https://github.com/... | ... | frontend, medium |
-| ... | ... | ... | ... | ... |
 
 ## Design Context Uploaded
 | Subtask | Context Files | Figma Nodes |
 |---------|---------------|-------------|
 | subtask-01-<name> | 3 | 2 |
-| subtask-02-<name> | 1 | 0 |
 
 ## Summary
-Issues created: N
+Issues created: 1
 Design context files uploaded: M
 All issues added to project: ✅ / ❌
 ```
@@ -288,4 +347,4 @@ All issues added to project: ✅ / ❌
 - Не модифицируй файлы конвейера (`*_output.md`, `task_spec.md`)
 - Labels формируй из TASK_DOMAIN + complexity из task_spec.md
 - Используй строго тот метод, который передан в `github_method`
-- При multi — каждая подзадача ОБЯЗАТЕЛЬНО привязывается как sub-issue к родительской issue сегмента
+- Если подзадач 2+ — ОБЯЗАТЕЛЬНО создавай родительскую issue и привязывай подзадачи как sub-issues (и при single, и при multi)

@@ -8,16 +8,20 @@ description: Оркестрирует конвейер реализации code
 ## Структура конвейера
 
 ```
-Пользователь → @task_analyst → final_analyst_output.md + design_context/
+Пользователь → @task_analyst → final_analyst_output.md + requirements_lock.md + design_context/
                                    ↓
                @architect → architect_output.md
-                                   ↓
+                  ↓
+               [if STATUS: NEEDS_CLARIFICATION → @task_analyst → пользователь → @task_analyst → @architect]
+                  ↓
                @engineer_[high|medium|low] × N   (параллельно, волны по <=4)
                                    ↓
                @developer_[high|medium|low] × N  (параллельно, волны по <=4)
                                    ↓
                @judge → judge_output.md + librarian_suggestions.md
-                                   ↓
+                  ↓
+               [if FAIL → оркестратор/пользователь с конкретными нарушениями]
+                  ↓ (PASS)
                [подтверждение пользователя]
                @librarian       (обновляет knowledge base)
                                    ↓
@@ -43,10 +47,10 @@ description: Оркестрирует конвейер реализации code
 | Агент | Что передавать |
 |-------|----------------|
 | `@task_analyst` | GitHub issue URL (или текст задачи) + путь к папке задачи |
-| `@architect` | Только путь к папке задачи |
-| `@engineer_[level]` | Путь к папке задачи + task_id |
+| `@architect` | Путь к папке задачи (агент сам читает requirements_lock.md) |
+| `@engineer_[level]` | Путь к папке задачи + task_id (агент сам читает requirements_lock.md) |
 | `@developer_[level]` | Путь к папке задачи + task_id + (опционально) `input_file` |
-| `@judge` | Только путь к папке задачи |
+| `@judge` | Только путь к папке задачи (агент сам читает requirements_lock.md) |
 | `@librarian` | Путь к папке задачи + список подтверждённых правил |
 | `@writer` | Только путь к папке задачи |
 
@@ -119,6 +123,30 @@ description: Оркестрирует конвейер реализации code
 11. После подтверждения пользователя → `@librarian`
 12. Если `TASK_TYPE: complex-feature` → `@writer`
 
+## Feedback loops
+
+### Architect → Task Analyst → Пользователь
+
+Если `architect_output.md` содержит `STATUS: NEEDS_CLARIFICATION`:
+
+1. Прочитай `architect_questions.md` из папки задачи
+2. Передай task_analyst на перевод вопросов пользователю
+3. Task_analyst задаёт вопросы пользователю через AskQuestion
+4. Task_analyst сохраняет ответы в `architect_answers.md`
+5. Перезапусти `@architect` с указанием на `architect_answers.md`
+
+**Счётчик:** `architect_clarification_rounds = 0`. Инкрементируй при каждом цикле. Стоп при >= 2.
+
+### Judge FAIL → Оркестратор/Пользователь
+
+Если `judge_output.md` содержит вердикт `НЕ ПРОШЁЛ`:
+
+1. Прочитай конкретные нарушения из `judge_output.md`
+2. Сообщи пользователю о нарушениях
+3. Предложи варианты: исправить вручную / перезапустить конвейер / продолжить
+
+Автоматический перезапуск конвейера НЕ выполняется — решение за пользователем.
+
 ## Активация domain-specific скиллов
 
 ### Базовая карта (core)
@@ -145,6 +173,7 @@ domain-specific скиллы. Перед передачей скиллов са�
 - `architecture-principles`
 - `engineering-from-architecture`
 - `doc-style`
+- `asking-questions-to-user`
 
 ## Агент вне конвейера: mentor
 

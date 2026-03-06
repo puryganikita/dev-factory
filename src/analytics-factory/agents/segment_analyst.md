@@ -132,6 +132,10 @@ Figma MCP инструмент `get_metadata` для получения стру
 # ASSIGNMENT_SUMMARY
 [1–3 предложения: суть задания]
 
+# USER_LANGUAGE
+[ru | en | ...]
+(определяется автоматически из языка текста задания пользователя)
+
 # SEGMENT_MODE
 [single | multi]
 

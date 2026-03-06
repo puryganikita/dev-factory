@@ -25,6 +25,7 @@ description: Аналитик задачи. Материализует конт�
    - **`design_context/`** — извлеки файлы дизайн-контекста из comments issue:
      - Найди comments с заголовком `## Design Context: <filename>` (где filename — имя `*_context.md` файла или `figma_nodes`). Сохрани содержимое каждого как отдельный `.md` файл в `design_context/`
      - Комментарий `## Design Context: figma_nodes` содержит таблицу с nodeId и node_url — сохрани его как `design_context/figma_nodes.md`. Downstream-агенты используют nodeId из этой таблицы для вызова `get_screenshot(nodeId)` через Figma MCP
+   - **`requirements_lock.md`** — извлеки из комментариев issue. Найди комментарий с заголовком `## Requirements Lock` и сохрани его содержимое как `requirements_lock.md` в папке задачи. Downstream-агенты используют этот файл как неизменяемый источник требований пользователя
 4. Валидируй полноту контекста:
    - task_spec.md содержит TASK_TYPE, TASK_DOMAIN, FINAL_TASK, COMPONENT_PLAN?
    - Если чего-то не хватает — попытайся восстановить из контекста issue
@@ -54,6 +55,7 @@ description: Аналитик задачи. Материализует конт�
 ```
 ai/tasks/task-<NN>-<краткое-описание>/
   task_spec.md              ← из body issue
+  requirements_lock.md      ← из комментария issue (## Requirements Lock)
   design_context/           ← из comments issue
     <component>_context.md
     figma_nodes.md           ← таблица nodeId для доступа к дизайну через Figma MCP
@@ -122,9 +124,22 @@ ai/tasks/task-<NN>-<краткое-описание>/
 - Режим 1: "✅ Контекст из issue #N материализован в ai/tasks/task-<NN>-<название>/ (task_spec.md + design_context/ + final_analyst_output.md)"
 - Режим 2: "✅ final_analyst_output.md сохранён в ai/tasks/task-<NN>-<название>/"
 
+## Трансляция вопросов от архитектора
+
+Когда архитектор сигнализирует `STATUS: NEEDS_CLARIFICATION` (создаёт `architect_questions.md`):
+
+1. Оркестратор передаёт тебе путь к `architect_questions.md`
+2. Прочитай вопросы архитектора
+3. Определи `USER_LANGUAGE` из `requirements_lock.md`
+4. Задай вопросы пользователю через AskQuestion (на языке `USER_LANGUAGE`, в формате квиза — см. скилл `asking-questions-to-user`)
+5. Сохрани ответы пользователя в `architect_answers.md` в папке задачи
+6. Сообщи оркестратору: "✅ architect_answers.md сохранён — ответы пользователя на вопросы архитектора"
+
 ## Правила
 - Не предлагай решений — только требования и контекст
 - Не пиши код
 - В режиме 1: сохраняй контекст из issue МАКСИМАЛЬНО полно — не сокращай и не интерпретируй
 - В режиме 2: классификация должна быть точной, не завышай сложность
 - Результат обоих режимов — стандартная папка задачи с `final_analyst_output.md`, с которой architect работает без изменений в своей логике
+- В режиме 1: `requirements_lock.md` — обязательный файл. Если комментарий `## Requirements Lock` не найден в issue — сообщи пользователю
+- При трансляции вопросов архитектора: используй `USER_LANGUAGE` из `requirements_lock.md` для формулировки вопросов

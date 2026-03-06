@@ -1,6 +1,6 @@
 ---
 name: analytics-pipeline-orchestration
-description: Оркестрирует аналитический конвейер analytics-factory. Начинает с сегментации задания, затем маршрутизирует по типу задачи и домену, управляет параллельным запуском аналитиков (в том числе параллельно по сегментам), передаёт результаты в board_manager для создания задач в GitHub Projects V2. Используй при вызове любого агента analytics-factory или при запросе "запусти аналитику".
+description: Оркестрирует аналитический конвейер analytics-factory. Начинает с сегментации, запускает analyst и requirements_lock_agent параллельно, управляет циклом вопросов к пользователю, маршрутизирует по домену, координирует feedback loops (analytics_judge → final_analyst, final_analyst → analyst), передаёт результаты в board_manager. Используй при вызове любого агента analytics-factory или при запросе "запусти аналитику".
 ---
 
 # Оркестрация аналитического конвейера
@@ -8,11 +8,15 @@ description: Оркестрирует аналитический конвейе�
 ## Структура конвейера
 
 ```
-Пользователь → @segment_analyst → segment_analyst_output.md (SEGMENT_MODE)
+Пользователь → @segment_analyst → segment_analyst_output.md (SEGMENT_MODE + USER_LANGUAGE)
                     ↓
          [SEGMENT_MODE: single]
-            @analyst → analyst_output.md (TASK_TYPE + TASK_DOMAIN + ANALYSIS_MODE)
-                                ↓
+            @analyst ‖ @requirements_lock_agent   (параллельно)
+                ↓              ↓
+            analyst_output.md  requirements_lock.md
+                ↓
+            [if STATUS: questions_pending → цикл вопросов → повтор @analyst]
+                ↓
                 [ANALYSIS_MODE: full, TASK_DOMAIN: frontend/fullstack]
                 @design_analyst ‖ @component_analyst   (параллельно)
                                 ↓
@@ -20,15 +24,18 @@ description: Оркестрирует аналитический конвейе�
                 @component_analyst                     (только один)
                                 ↓
                 @final_analyst → final_analyst_output.md + subtasks/
-                                ↓
-                [ANALYSIS_MODE: simple]
-                analyst сам пишет final_analyst_output.md
-                                ↓
+                ↓
+            [if STATUS: needs_clarification → маршрут к @analyst → цикл вопросов → повтор @final_analyst]
+                ↓
+            @analytics_judge → analytics_judge_output.md
+                ↓
+            [if FAIL → маршрут к @final_analyst → повтор @analytics_judge]
+                ↓ (PASS)
             @board_manager → board_output.md (issues в GitHub Projects V2)
 
          [SEGMENT_MODE: multi]
             Для КАЖДОГО сегмента ПАРАЛЛЕЛЬНО:
-              @analyst → маршрутизация → @final_analyst
+              @analyst ‖ @requirements_lock_agent → маршрутизация → @final_analyst → @analytics_judge
             (путь = папка сегмента)
                                 ↓
             @board_manager → board_output.md (parent issues + sub-issues)
@@ -50,7 +57,7 @@ description: Оркестрирует аналитический конвейе�
 **Первое действие** после получения задачи — вызов `@segment_analyst`.
 
 **Единственное исключение для чтения файлов:** output-файлы агентов (`segment_analyst_output.md`,
-`analyst_output.md`, `final_analyst_output.md`) — оркестратор читает их для определения следующего шага маршрута.
+`analyst_output.md`, `final_analyst_output.md`, `analytics_judge_output.md`) — оркестратор читает их для определения следующего шага маршрута.
 
 ## Что передавать каждому агенту
 
@@ -59,9 +66,12 @@ description: Оркестрирует аналитический конвейе�
 | `@segment_analyst` | Задачу пользователя дословно + путь к папке задачи |
 | `@analyst` (при single) | Задачу пользователя дословно + путь к папке задачи |
 | `@analyst` (при multi) | Путь к папке сегмента + «Задача для аналитика» + «Границы контекста» из segment_analyst_output.md |
+| `@analyst` (повторный, с ответами) | Путь к папке задачи + ответы пользователя на вопросы |
+| `@requirements_lock_agent` | Задачу пользователя дословно + путь к папке задачи |
 | `@design_analyst` | Только путь к папке задачи (или папке сегмента при multi) |
 | `@component_analyst` | Только путь к папке задачи (или папке сегмента при multi) |
 | `@final_analyst` | Только путь к папке задачи (или папке сегмента при multi) |
+| `@analytics_judge` | Только путь к папке задачи (или папке сегмента при multi) |
 | `@board_manager` | Путь к корневой папке задачи + owner/repo + project_number + github_method (`gh` или `mcp`) |
 
 При создании агента, открывай ему доступ до папки .cursor/skills (открывай доступ ко всем skills) - агент сам определит какие skills он должен использовать.
@@ -70,7 +80,7 @@ description: Оркестрирует аналитический конвейе�
 
 **Первое действие** после получения задачи — вызов `@segment_analyst`.
 
-После завершения прочитай `segment_analyst_output.md` и определи `SEGMENT_MODE`:
+После завершения прочитай `segment_analyst_output.md` и определи `SEGMENT_MODE`.
 
 ### SEGMENT_MODE: single
 
@@ -79,25 +89,38 @@ description: Оркестрирует аналитический конвейе�
 ### SEGMENT_MODE: multi
 
 1. Создай папки для каждого сегмента: `ai/tasks/task-<NN>-<name>/segments/segment-NN-<name>/`
-2. Запусти `@analyst` **параллельно** для каждого сегмента — каждому передай:
-   - Путь к папке сегмента
-   - «Задача для аналитика» из соответствующего сегмента в segment_analyst_output.md
-   - «Границы контекста» из соответствующего сегмента в segment_analyst_output.md
-3. После завершения всех `@analyst` — для каждого сегмента прочитай его `analyst_output.md` и маршрутизируй по стандартным правилам (Этап 1), подставляя путь к папке сегмента
-4. Параллельные этапы (design_analyst ‖ component_analyst) для разных сегментов можно запускать параллельно
+2. Запусти `@analyst` и `@requirements_lock_agent` **параллельно** для каждого сегмента
+3. После завершения — обработай цикл вопросов (Этап 1.1) для каждого сегмента
+4. Маршрутизируй по стандартным правилам (Этап 2), подставляя путь к папке сегмента
 5. После завершения всех сегментов — один запуск `@board_manager` с путём к корневой папке задачи
 
-## Этап 1: Классификация (analyst)
+## Этап 1: Классификация и фиксация требований
 
-При `SEGMENT_MODE: single` — вызови `@analyst` с задачей пользователя и путём к папке задачи.
-При `SEGMENT_MODE: multi` — `@analyst` уже запущен на этапе 0.
+**Параллельный запуск:** `@analyst` и `@requirements_lock_agent` запускаются одновременно.
 
-После завершения прочитай `analyst_output.md` и определи `ANALYSIS_MODE`:
+После завершения обоих:
+1. Прочитай `analyst_output.md` — проверь `STATUS`
+2. Если `STATUS: questions_pending` → переходи к Этапу 1.1 (цикл вопросов)
+3. Если `STATUS: ok` → определи `ANALYSIS_MODE` и переходи далее
 
-- `ANALYSIS_MODE: simple` → `@analyst` сам написал `final_analyst_output.md` → переходи к Board Manager
-- `ANALYSIS_MODE: full` → переходи к Этапу 2
+### Этап 1.1: Цикл вопросов к пользователю
+
+Если `analyst_output.md` содержит `STATUS: questions_pending`:
+
+1. Прочитай секцию `QUESTIONS_FOR_USER` из `analyst_output.md`
+2. Задай вопросы пользователю через AskQuestion (используй скилл `asking-questions-to-user`)
+3. Передай ответы пользователя обратно `@analyst`
+4. Повтори: прочитай обновлённый `analyst_output.md`
+5. Если снова `questions_pending` — повтори (максимум 3 раунда)
+6. После 3 раундов — продолжи с тем, что есть
+
+**Счётчик:** `analyst_question_rounds = 0`. Инкрементируй при каждом раунде. Стоп при >= 3.
 
 ## Этап 2: Доменная маршрутизация [full analysis]
+
+Определи `ANALYSIS_MODE`:
+- `ANALYSIS_MODE: simple` → переходи сразу к Этапу 3 (final_analyst)
+- `ANALYSIS_MODE: full` → запусти доменных аналитиков
 
 Состав [full analysis] зависит от `TASK_DOMAIN`:
 
@@ -109,32 +132,42 @@ description: Оркестрирует аналитический конвейе�
 | `infra` | `@component_analyst` → `@final_analyst` (design_analyst пропускается) |
 | `other` | `@component_analyst` → `@final_analyst` (design_analyst пропускается) |
 
-## Параллельный запуск
+## Этап 3: Финальный анализ и декомпозиция
 
-**Параллельный запуск = несколько вызовов Task в ОДНОМ ответе агента.**
+Запусти `@final_analyst`.
 
-```
-← один ответ содержит:
-  @design_analyst (папка=ai/tasks/task-01/)
-  @component_analyst (папка=ai/tasks/task-01/)
-← оба запущены параллельно
-```
+После завершения прочитай `final_analyst_output.md` — проверь `STATUS`:
 
-При `SEGMENT_MODE: multi` параллелизм распространяется и на сегменты:
+- `STATUS: ok` → переходи к Этапу 4 (analytics_judge)
+- `STATUS: needs_clarification` → feedback loop к analyst:
+  1. Прочитай `QUESTIONS_FOR_USER` из `final_analyst_output.md`
+  2. Маршрутизируй к `@analyst` — он задаст вопросы пользователю
+  3. После получения ответов — перезапусти `@final_analyst`
+  4. Максимум 2 итерации этого цикла
 
-```
-← один ответ содержит:
-  @analyst (папка=segments/segment-01-homepage/)
-  @analyst (папка=segments/segment-02-catalog/)
-  @analyst (папка=segments/segment-03-profile/)
-← все запущены параллельно
-```
+**Счётчик:** `final_analyst_clarification_rounds = 0`. Инкрементируй при каждом цикле. Стоп при >= 2.
 
-## Board Manager — завершение конвейера
+## Этап 4: Валидация аналитики (analytics_judge)
+
+Запусти `@analytics_judge`.
+
+После завершения прочитай `analytics_judge_output.md`:
+
+- **Вердикт: ПРОШЁЛ** → переходи к Этапу 5 (board_manager)
+- **Вердикт: НЕ ПРОШЁЛ** → feedback loop к final_analyst:
+  1. Передай `analytics_judge_output.md` с конкретными нарушениями в `@final_analyst`
+  2. Final_analyst исправляет декомпозицию
+  3. Перезапусти `@analytics_judge`
+  4. Максимум 2 итерации этого цикла
+
+**Счётчик:** `judge_feedback_rounds = 0`. Инкрементируй при каждом цикле. Стоп при >= 2.
+При превышении лимита — сообщи пользователю о нерешённых нарушениях и предложи продолжить или остановиться.
+
+## Этап 5: Board Manager — завершение конвейера
 
 `@board_manager` запускается **всегда** в конце конвейера (и при simple, и при full, и при single, и при multi).
 
-При `SEGMENT_MODE: multi` — `@board_manager` получает путь к **корневой** папке задачи (не к папке сегмента). Он сам прочитает `segment_analyst_output.md` и обработает все сегменты.
+При `SEGMENT_MODE: multi` — `@board_manager` получает путь к **корневой** папке задачи.
 
 ### Перед запуском board_manager — выбор метода доступа к GitHub
 
@@ -143,35 +176,46 @@ description: Оркестрирует аналитический конвейе�
 
 **Шаг 1: Проверь доступность методов**
 - **gh CLI:** выполни `gh auth status` через Shell. Если exit code 0 — gh доступен и авторизован.
-- **GitHub MCP:** проверь наличие MCP-сервера с GitHub-инструментами среди доступных MCP (по наличию инструментов `create_issue` или аналогичных).
+- **GitHub MCP:** проверь наличие MCP-сервера с GitHub-инструментами среди доступных MCP.
 
 **Шаг 2: Спроси пользователя**
 
-Задай пользователю вопрос с результатами проверки. Формат:
-
-```
-📋 Для создания задач на GitHub board нужно выбрать метод доступа:
-
-1️⃣ gh CLI [✅ доступен / ❌ не найден]
-   Требования: установлен gh (https://cli.github.com), авторизация через `gh auth login`
-
-2️⃣ GitHub MCP [✅ доступен / ❌ не найден]
-   Требования: подключён GitHub MCP-сервер в Cursor (Settings → Tools & MCP), авторизация пройдена на уровне MCP
-
-Какой метод использовать?
-```
+Задай пользователю вопрос с результатами проверки (через AskQuestion).
 
 Если доступен только один метод — всё равно спроси подтверждение.
 Если оба недоступны — сообщи пользователю и предложи инструкции по настройке.
 
 ### Параметры для board_manager
 
-Для запуска оркестратор должен знать:
 - **owner/repo** — из конфига `ai-dev-factory/dev-factory.config.json` или от пользователя
 - **project_number** — из конфига или от пользователя
-- **github_method** — `gh` или `mcp` (из ответа пользователя на шаге выше)
+- **github_method** — `gh` или `mcp`
 
-Если конфиг не содержит owner/repo или project_number — спроси пользователя.
+## Параллельный запуск
+
+**Параллельный запуск = несколько вызовов Task в ОДНОМ ответе агента.**
+
+```
+← один ответ содержит:
+  @analyst (папка=ai/tasks/task-01/)
+  @requirements_lock_agent (папка=ai/tasks/task-01/)
+← оба запущены параллельно
+```
+
+```
+← один ответ содержит:
+  @design_analyst (папка=ai/tasks/task-01/)
+  @component_analyst (папка=ai/tasks/task-01/)
+← оба запущены параллельно
+```
+
+## Лимиты итераций (защита от бесконечных циклов)
+
+| Цикл | Макс. итераций | При превышении |
+|------|---------------|----------------|
+| Вопросы analyst → пользователь | 3 | Продолжить с текущим состоянием |
+| final_analyst NEEDS_CLARIFICATION → analyst | 2 | Продолжить с текущим состоянием |
+| analytics_judge FAIL → final_analyst | 2 | Сообщить пользователю, предложить продолжить/остановить |
 
 ## Что считается командой продолжить
 
@@ -192,25 +236,17 @@ description: Оркестрирует аналитический конвейе�
 ✅ @segment_analyst завершил работу
 📄 ai/tasks/task-<NN>-<название>/segment_analyst_output.md
 SEGMENT_MODE: [single | multi]
+USER_LANGUAGE: [ru | en | ...]
 Сегментов: N
 ⏸ Жду следующей команды.
 ```
 
-**После analyst (single):**
+**После analyst + requirements_lock_agent (параллельно):**
 ```
-✅ @analyst завершил работу
-📄 ai/tasks/task-<NN>-<название>/analyst_output.md
-TASK_DOMAIN: [frontend | backend | fullstack | infra | other]
-ANALYSIS_MODE: [simple | full]
-⏸ Жду следующей команды.
-```
-
-**После analyst (multi — все сегменты):**
-```
-✅ @analyst завершил работу для N сегментов
-📄 segments/segment-01-<name>/analyst_output.md — TASK_DOMAIN: ..., ANALYSIS_MODE: ...
-📄 segments/segment-02-<name>/analyst_output.md — TASK_DOMAIN: ..., ANALYSIS_MODE: ...
-...
+✅ @analyst и @requirements_lock_agent завершили работу
+📄 analyst_output.md — STATUS: [ok | questions_pending], ANALYSIS_MODE: [simple | full]
+📄 requirements_lock.md — MUST: N, MUST_NOT: M, API_SIGNATURES: K
+[если questions_pending: ❓ Есть вопросы к пользователю (N вопросов)]
 ⏸ Жду следующей команды.
 ```
 
@@ -225,8 +261,17 @@ ANALYSIS_MODE: [simple | full]
 **После final_analyst:**
 ```
 ✅ @final_analyst завершил работу
-📄 final_analyst_output.md — подзадач: N
+📄 final_analyst_output.md — STATUS: [ok | needs_clarification], подзадач: N
 📁 subtasks/subtask-01-.../, subtasks/subtask-02-.../
+[если needs_clarification: ❓ Есть вопросы к пользователю]
+⏸ Жду следующей команды.
+```
+
+**После analytics_judge:**
+```
+✅ @analytics_judge завершил работу
+📄 analytics_judge_output.md — Вердикт: [ПРОШЁЛ | НЕ ПРОШЁЛ]
+[если НЕ ПРОШЁЛ: ❌ Нарушений: N — запускаю feedback loop к final_analyst]
 ⏸ Жду следующей команды.
 ```
 

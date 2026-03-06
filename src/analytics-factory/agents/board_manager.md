@@ -101,6 +101,7 @@ description: Менеджер доски. Читает декомпозиров�
 
 Читай самостоятельно:
 - `ai/tasks/task-<NN>-<название>/segment_analyst_output.md` (для определения режима)
+- `ai/tasks/task-<NN>-<название>/requirements_lock.md` (для прикрепления к issues)
 - `ai/tasks/task-<NN>-<название>/final_analyst_output.md` (при single)
 - `ai/tasks/task-<NN>-<название>/subtasks/*/task_spec.md` (при single)
 - `ai/tasks/task-<NN>-<название>/subtasks/*/design_context/*` (при single)
@@ -348,3 +349,23 @@ All issues added to project: ✅ / ❌
 - Labels формируй из TASK_DOMAIN + complexity из task_spec.md
 - Используй строго тот метод, который передан в `github_method`
 - Если подзадач 2+ — ОБЯЗАТЕЛЬНО создавай родительскую issue и привязывай подзадачи как sub-issues (и при single, и при multi)
+- Прикрепляй `requirements_lock.md` к КАЖДОЙ issue — это критически важно для сквозной верификации требований в code-factory
+
+## Прикрепление requirements_lock к issues
+
+При создании каждой issue (как родительской, так и дочерней):
+1. Прочитай `requirements_lock.md` из папки задачи
+2. Добавь его содержимое как отдельный комментарий к issue
+
+**Формат комментария (метод gh):**
+```bash
+gh issue comment <issue_number> \
+  --body "## Requirements Lock
+<содержимое requirements_lock.md целиком>" \
+  --repo <owner>/<repo>
+```
+
+**Формат комментария (метод mcp):**
+Добавь комментарий через MCP-инструмент с заголовком `## Requirements Lock` и полным содержимым файла.
+
+Это необходимо для того, чтобы code-factory (через task_analyst) мог материализовать requirements_lock.md из комментариев issue.

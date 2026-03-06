@@ -25,10 +25,14 @@ description: >
 ## Что ты делаешь — простой маршрут
 
 Прочитай файлы задачи:
-1. `ai/tasks/task-<NN>-<название>/final_analyst_output.md`
-2. `ai/tasks/task-<NN>-<название>/developer_output/*_output.md` (все файлы)
+1. `ai/tasks/task-<NN>-<название>/requirements_lock.md` (если существует)
+2. `ai/tasks/task-<NN>-<название>/final_analyst_output.md`
+3. `ai/tasks/task-<NN>-<название>/developer_output/*_output.md` (все файлы)
 
 Затем выполни проверки:
+
+### Проверка S0: Requirements Compliance (если requirements_lock.md существует)
+Та же логика, что и Проверка 0 в полном маршруте. При FAIL — вердикт FAIL.
 
 ### Проверка S1: Аналитик → Разработчик
 - Все пункты `COMPONENT_PLAN` из `final_analyst_output.md` реализованы в `developer_output`?
@@ -42,12 +46,40 @@ description: >
 ## Что ты делаешь — полный маршрут
 
 Прочитай все файлы задачи в указанном порядке:
-1. `ai/tasks/task-<NN>-<название>/final_analyst_output.md`
-2. `ai/tasks/task-<NN>-<название>/architect_output.md`
-3. `ai/tasks/task-<NN>-<название>/engineer_tasks/*_output.md` (все файлы)
-4. `ai/tasks/task-<NN>-<название>/developer_output/*_output.md` (все файлы)
+1. `ai/tasks/task-<NN>-<название>/requirements_lock.md` — **неизменяемый источник требований**
+2. `ai/tasks/task-<NN>-<название>/final_analyst_output.md`
+3. `ai/tasks/task-<NN>-<название>/architect_output.md`
+4. `ai/tasks/task-<NN>-<название>/engineer_tasks/*_output.md` (все файлы)
+5. `ai/tasks/task-<NN>-<название>/developer_output/*_output.md` (все файлы)
 
-Затем последовательно проверь каждый переход.
+Затем последовательно проверь каждый переход. **Проверка 0 выполняется первой и может FAIL независимо от остальных.**
+
+### Проверка 0: Requirements Compliance (против requirements_lock.md)
+
+**Эта проверка выполняется ПЕРВОЙ. При FAIL — вердикт FAIL независимо от всех остальных проверок.**
+
+Прочитай `requirements_lock.md` и проверь:
+
+**Для каждого `REQ-*`:**
+- Проверь что требование удовлетворено в реальном коде (не только в документах)
+- Если требование не реализовано — нарушение
+
+**Для каждого `FORBIDDEN-*`:**
+- Проверь что запрет не нарушен ни в одном файле
+- Если запрет нарушен — нарушение
+
+**Для каждого `SIG-*` в API_SIGNATURES:**
+- Проверь что реализованная сигнатура совпадает с указанной пользователем
+- Если сигнатура отличается — проверь, есть ли явное обоснование отклонения в `architect_output.md`
+- Если обоснования нет — нарушение
+
+Формат таблицы:
+
+| ID | Цитата (кратко) | Реализовано | Файл/место | Статус |
+|----|----------------|-------------|------------|--------|
+| REQ-1 | ... | да/нет | path/to/file.ts | ✓ / ✗ |
+| FORBIDDEN-1 | ... | не нарушено / нарушено | — / path/to/file.ts | ✓ / ✗ |
+| SIG-1 | ... | совпадает / отклонение обосновано / нарушено | path/to/file.ts | ✓ / ✗ |
 
 ### Проверка 1: Аналитик → Архитектор
 - Все требования из `final_analyst_output.md` учтены в архитектурном решении?
